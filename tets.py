@@ -1,34 +1,32 @@
 import streamlit as st
 import subprocess
 
-# Caminhos para os scripts de relatórios separados por banco
+# Caminhos para os scripts de relatórios
 sicoob_caminho = "D:\\PYTHON\\AUTOCOMP\\SISTEMA\\RELATORIO\\PROCESSO\\RELATORIO_TRANSF_SICOOB.py"
 santander_caminho = "D:\\PYTHON\\AUTOCOMP\\SISTEMA\\RELATORIO\\PROCESSO\\RELATORIO_TRANSF_SANTANDER.py"
 itau_caminho = "D:\\PYTHON\\AUTOCOMP\\SISTEMA\\RELATORIO\\PROCESSO\\RELATORIO_TRANSF_ITAU.py"
 bradesco_caminho = "D:\\PYTHON\\AUTOCOMP\\SISTEMA\\RELATORIO\\PROCESSO\\RELATORIO_TRANSF_BRADESCO.py"
 banco_do_brasil_caminho = "D:\\PYTHON\\AUTOCOMP\\SISTEMA\\RELATORIO\\PROCESSO\\RELATORIO_TRANSF_BANCOBRASIL.py"
 
-# Caminho para o script de cooperados
+# Caminho para outros scripts
 caminho_script_relatorio_cooperados = "D:\\PYTHON\\AUTOCOMP\\SISTEMA\\RELATORIO\\PROCESSO\\RELATORIO_COOPERADO.py"
-
-# Caminho para o script de concatenação de comprovantes
 caminho_script_concat_comprovantes = "D:\\PYTHON\\AUTOCOMP\\SISTEMA\\RELATORIO\\PROCESSO\\CONCAT_RELATORIO_COMP.py"
-
-# Caminho para o script de relatório analítico
 caminho_script_relatorio_analitico = "D:\\PYTHON\\AUTOCOMP\\SISTEMA\\RELATORIO\\PROCESSO\\RELATORIO_ANALISE.py"
-
-# Caminho para o script de separação de comprovantes
 caminho_script_separar_comprovantes = "D:\\PYTHON\\AUTOCOMP\\SISTEMA\\RELATORIO\\PROCESSO\\SPLIT TRANSF.py"
-
-# Caminho para o script de processar comprovantes
 caminho_script_processar_comprovantes = "D:\\PYTHON\\AUTOCOMP\\SISTEMA\\RELATORIO\\PROCESSO\\PROCESSAR_GERAL.py"
 
 def executar_script(caminho_script):
     try:
         resultado = subprocess.run(['python', caminho_script], check=True, capture_output=True, text=True)
         st.success(f"Script {caminho_script} executado com sucesso!")
-    except Exception as e:
+        st.text("Saída do script:")
+        st.code(resultado.stdout)
+    except subprocess.CalledProcessError as e:
         st.error(f"Erro ao executar o script {caminho_script}: {e}")
+        st.text("Saída de erro:")
+        st.code(e.stderr)
+    except Exception as e:
+        st.error(f"Erro inesperado ao executar o script {caminho_script}: {e}")
 
 def main():
     st.title("Sistema de Relatórios de Transferências")
