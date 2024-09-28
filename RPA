@@ -1,0 +1,260 @@
+import subprocess 
+import threading
+import tkinter as tk
+from tkinter import messagebox, filedialog
+import customtkinter as ctk
+from PIL import Image
+from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
+import fitz
+import re
+import pandas as pd
+import threading
+
+# Funções existentes para execução de scripts
+def executar_script(caminho_script, mensagem_erro):
+    try:
+        resultado = subprocess.run(['pythonw', caminho_script], check=True, capture_output=True, text=True)
+        print("Saída do script:", resultado.stdout)
+    except Exception as e:
+        print(f"Erro ao executar o script: {e}")
+        messagebox.showerror("Erro", f"{mensagem_erro}: {e}")
+
+def executar_script_async(caminho_script, mensagem_erro):
+    threading.Thread(target=executar_script, args=(caminho_script, mensagem_erro)).start()
+
+# Classe principal da aplicação
+class App(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("RPA - TESOURARIA")
+        self.geometry("800x600")
+
+        # Cores
+        self.bg_color = "#ffffff"  # Cor de fundo branca
+        self.button_color = "#007AB2"
+        self.hover_color = "#003262"
+
+        # Frame externo para o tema
+        self.top_frame_external = ctk.CTkFrame(self, fg_color=self.bg_color)
+        self.top_frame_external.pack(side="top", fill="x")
+
+        # Barra superior com fundo azul
+        self.top_frame = ctk.CTkFrame(self.top_frame_external, fg_color=self.button_color)
+        self.top_frame.pack(side="top", fill="x", padx=5, pady=5)
+
+        self.logo_image = Image.open(r"C:\RPA\LOGO\LOGO.png")  # Carregar a imagem com PIL
+        self.logo_image = ctk.CTkImage(light_image=self.logo_image, dark_image=self.logo_image, size=(50, 50))
+        self.logo_label = ctk.CTkLabel(self.top_frame, image=self.logo_image, text="")
+        self.logo_label.pack(side="left", padx=5, pady=5)
+
+        # Título na barra superior
+        self.title_label = ctk.CTkLabel(self.top_frame, text="COMPROVANTES COOPERADOS", text_color="#ffffff", font=("Arial", 16, "bold"))
+        self.title_label.pack(side="left", padx=10, pady=10)
+
+        # Sidebar para os botões de automação
+        self.sidebar = ctk.CTkFrame(self, width=250, fg_color=self.bg_color)  # Mantém o fundo branco na sidebar
+        self.sidebar.pack(side="left", fill="y")
+
+        self.button_style = {
+            "fg_color": self.button_color,
+            "hover_color": self.hover_color,
+            "text_color": "#ffffff",
+            "corner_radius": 10,
+            "font": ("Arial", 12, "bold"),
+        }
+
+        # Botões na lateral
+        self.processar_button = ctk.CTkButton(
+            self.sidebar, 
+            text="SEPARAR COMPROVANTES(SICOOB)", 
+            command=self.executar_separar_comprovante_sicoob, 
+            **self.button_style
+        )
+        self.processar_button.pack(pady=10, padx=10, fill="x")
+
+        self.processar_button = ctk.CTkButton(
+            self.sidebar, 
+            text="SEPARAR COMPROVANTES(ITAÚ)", 
+            command=self.executar_separar_comprovante_itaú, 
+            **self.button_style
+        )
+        self.processar_button.pack(pady=10, padx=10, fill="x")
+
+        self.relatorio_cooperados_button = ctk.CTkButton(
+            self.sidebar, 
+            text="RELATÓRIO COOPERADOS", 
+            command=self.executar_relatorio_cooperados, 
+            **self.button_style
+        )
+        self.relatorio_cooperados_button.pack(pady=10, padx=10, fill="x")
+
+        # Botão "RELATÓRIO COMPROVANTES"
+        self.relatorio_comprovantes_button = ctk.CTkButton(
+            self.sidebar, 
+            text="RELATÓRIO COMPROVANTES", 
+            command=self.exibir_relatorio_comprovantes, 
+            **self.button_style
+        )
+        self.relatorio_comprovantes_button.pack(pady=10, padx=10, fill="x")
+
+        # Novo botão "CONCAT COMPROVANTES"
+        self.concat_comprovantes_button = ctk.CTkButton(
+            self.sidebar, 
+            text="CONCATENAR RELATÓRIOS(COMPROV.)", 
+            command=self.executar_concat_comprovantes, 
+            **self.button_style
+        )
+        self.concat_comprovantes_button.pack(pady=10, padx=10, fill="x")
+
+        # Botão "RELATÓRIO ANALÍTICO"
+        self.relatorio_analitico_button = ctk.CTkButton(
+            self.sidebar, 
+            text="RELATÓRIO ANALÍTICO", 
+            command=self.executar_relatorio_analitico, 
+            **self.button_style
+        )
+        self.relatorio_analitico_button.pack(pady=10, padx=10, fill="x")
+
+        # Botão "PROCESSAR COMPROVANTES"
+        self.processar_comprovantes_button = ctk.CTkButton(
+            self.sidebar, 
+            text="PROCESSAR COMPROVANTES", 
+            command=self.executar_processar_comprovantes, 
+            **self.button_style
+        )
+        self.processar_comprovantes_button.pack(pady=10, padx=10, fill="x")
+
+        # Botão "ENVIO DE COMPROVANTES"
+        self.envio_comprovantes_button = ctk.CTkButton(
+            self.sidebar, 
+            text="ENVIO DE COMPROVANTES", 
+            command=self.executar_envio_comprovantes, 
+            **self.button_style
+        )
+        self.envio_comprovantes_button.pack(pady=10, padx=10, fill="x")
+
+        # Frame central para seleção de banco
+        self.central_frame = ctk.CTkFrame(self, fg_color=self.bg_color)  # Mantém o fundo branco no frame central
+        self.central_frame.pack(expand=True, fill="both")
+
+        # Inicializa a variável do banco
+        self.banco_var = tk.StringVar(value="SICOOB")
+
+        # Caminhos para scripts de relatórios separados por banco
+        self.sicoob_caminho = r"C:\RPA\GERAL\SICOOB.py"
+        self.santander_caminho = r"C:\RPA\GERAL\SANTANDER.py"
+        self.itau_caminho = r"C:\RPA\GERAL\ITAÚ.py"
+        self.bradesco_caminho = r"C:\RPA\GERAL\BRADESCO.py"
+        self.banco_do_brasil_caminho = r"C:\RPA\GERAL\BANCOBRASIL.py"
+
+        # Caminho para o script de cooperados
+        self.caminho_script_relatorio_cooperados = r"C:\RPA\GERAL\RELATORIO_COOPERADO.py"
+        
+        # Caminho para o script de concatenação de comprovantes
+        self.caminho_script_concat_comprovantes = r"C:\RPA\GERAL\CONCAT_RELATORIO_COMP.py"
+
+        # Caminho para o script de relatório analítico
+        self.caminho_script_relatorio_analitico = r"C:\RPA\GERAL\RELATORIO_ANALISE.py"
+
+        # Caminho para o script de separação de comprovantes
+        self.caminho_script_separar_comprovantes_itaú = r"C:\RPA\SEPARADOR\SEPARADOR_ITAU.py"
+
+        # Caminho para o script de separação de comprovantes
+        self.caminho_script_separar_comprovantes_sicoob = r"C:\RPA\SEPARADOR\SPLIT_TRANSF.py"
+
+        # Caminho para o script de processar comprovantes
+        self.caminho_script_processar_comprovantes = r"C:\RPA\GERAL\PROCESSAR_GERAL.py"
+        self.caminho_script_envio_comprovantes = r"C:\RPA\GERAL\ENVIO.py"
+
+        # Elementos do seletor de banco para o relatório de comprovantes
+        self.relatorio_frame = ctk.CTkFrame(self.central_frame, fg_color=self.bg_color)  # Mantém o fundo branco
+        self.relatorio_frame.pack(pady=20)
+
+        # Label "ESCOLHA O BANCO"
+        self.label_banco = ctk.CTkLabel(self.relatorio_frame, text="ESCOLHA O BANCO", text_color="#000000", font=("Arial", 14, "bold"))
+        self.label_banco.pack(pady=10)  # Adicionado aqui para que fique acima do combobox
+
+        # Seletor de banco
+        self.relatorio_combobox = ctk.CTkComboBox(
+        self.relatorio_frame, 
+        variable=self.banco_var, 
+        values=["SICOOB", "SANTANDER", "ITAÚ", "BRADESCO", "BANCO DO BRASIL"], 
+        font=("Arial", 13),
+        fg_color="#ffffff",  # Cor de fundo do seletor
+        text_color="#000000",  # Cor do texto
+        dropdown_fg_color="#ffffff",  # Cor de fundo do dropdown
+        dropdown_text_color="#000000"  # Cor do texto no dropdown
+)
+
+        self.relatorio_combobox.pack(pady=10)
+
+        # Botão "GERAR RELATÓRIO"
+        self.relatorio_gerar_button = ctk.CTkButton(
+            self.relatorio_frame, 
+            text="GERAR RELATÓRIO", 
+            command=self.gerar_relatorio, 
+            **self.button_style
+        )
+        self.relatorio_gerar_button.pack(pady=10)
+
+        # Ocultar o frame do relatório inicialmente
+        self.relatorio_frame.pack_forget()
+
+    def exibir_relatorio_comprovantes(self):
+        # Ocultar outros frames (se houver)
+        self.ocultar_todos_os_frames()
+
+        # Exibe o frame do relatório de comprovantes
+        self.relatorio_frame.pack(pady=20)
+
+    def ocultar_todos_os_frames(self):
+        # Oculta o frame do relatório de comprovantes
+        self.relatorio_frame.pack_forget()
+
+    def gerar_relatorio(self):
+        banco_selecionado = self.banco_var.get()
+        if banco_selecionado == "SICOOB":
+            executar_script_async(self.sicoob_caminho, "Erro ao gerar relatório para SICOOB.")
+        elif banco_selecionado == "SANTANDER":
+            executar_script_async(self.santander_caminho, "Erro ao gerar relatório para SANTANDER.")
+        elif banco_selecionado == "ITAÚ":
+            executar_script_async(self.itau_caminho, "Erro ao gerar relatório para ITAU.")
+        elif banco_selecionado == "BRADESCO":
+            executar_script_async(self.bradesco_caminho, "Erro ao gerar relatório para BRADESCO.")
+        elif banco_selecionado == "BANCO DO BRASIL":
+            executar_script_async(self.banco_do_brasil_caminho, "Erro ao gerar relatório para BANCO DO BRASIL.")
+        else:
+            messagebox.showwarning("Selecione um banco", "Por favor, selecione um banco válido.")
+
+    def executar_separar_comprovante_sicoob(self):
+        self.ocultar_todos_os_frames()  # Oculta outros frames antes de executar
+        executar_script_async(self.caminho_script_separar_comprovantes_sicoob, "Erro ao separar comprovantes.")
+
+    def executar_separar_comprovante_itaú(self):
+        self.ocultar_todos_os_frames()  # Oculta outros frames antes de executar
+        executar_script_async(self.caminho_script_separar_comprovantes_itaú, "Erro ao separar comprovantes.")
+
+    def executar_relatorio_cooperados(self):
+        self.ocultar_todos_os_frames()  # Oculta outros frames antes de executar
+        executar_script_async(self.caminho_script_relatorio_cooperados, "Erro ao gerar relatório de cooperados.")
+
+    def executar_concat_comprovantes(self):
+        self.ocultar_todos_os_frames()  # Oculta outros frames antes de executar
+        executar_script_async(self.caminho_script_concat_comprovantes, "Erro ao concatenar comprovantes.")
+
+    def executar_relatorio_analitico(self):
+        self.ocultar_todos_os_frames()  # Oculta outros frames antes de executar
+        executar_script_async(self.caminho_script_relatorio_analitico, "Erro ao gerar relatório analítico.")
+
+    def executar_processar_comprovantes(self):
+        self.ocultar_todos_os_frames()  # Oculta outros frames antes de executar
+        executar_script_async(self.caminho_script_processar_comprovantes, "Erro ao processar comprovantes.")
+
+    def executar_envio_comprovantes(self):
+        self.ocultar_todos_os_frames()  # Oculta outros frames antes de executar
+        executar_script_async(self.caminho_script_envio_comprovantes, "Erro ao processar comprovantes.")
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()
+
